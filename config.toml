@@ -12,25 +12,25 @@ limit = 150
 category = "cs.CV"
 title = "Computer Vision and Pattern Recognition"
 
-[[sources]]
-limit = 150
-category = "cs.AI"
-title = "Artificial Intelligence"
+# [[sources]]
+# limit = 150
+# category = "cs.AI"
+# title = "Artificial Intelligence"
 
-[[sources]]
-limit = 150
-category = "cs.LG"
-title = "Machine Learning"
+# [[sources]]
+# limit = 150
+# category = "cs.LG"
+# title = "Machine Learning"
 
-[[sources]]
-limit = 150
-category = "eess.IV"
-title = "Image and Video Processing"
+# [[sources]]
+# limit = 150
+# category = "eess.IV"
+# title = "Image and Video Processing"
 
-[[sources]]
-limit = 150
-category = "cs.DS"
-title = "Data Structures and Algorithms"
+# [[sources]]
+# limit = 150
+# category = "cs.DS"
+# title = "Data Structures and Algorithms"
 
 # [[sources]]
 # limit = 150
@@ -38,9 +38,9 @@ title = "Data Structures and Algorithms"
 # title = "Distributed, Parallel, and Cluster Computing"
 
 [[sources]]
-limit = 150
-category = "eess.SY"
-title = "Systems and Control"
+# limit = 150
+# category = "eess.SY"
+# title = "Systems and Control"
 
 [scripts]
 highlight_title = "scripts/highlight_title.rhai"
