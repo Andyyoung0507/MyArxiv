@@ -37,7 +37,7 @@ title = "Computer Vision and Pattern Recognition"
 # category = "cs.DC"
 # title = "Distributed, Parallel, and Cluster Computing"
 
-[[sources]]
+# [[sources]]
 # limit = 150
 # category = "eess.SY"
 # title = "Systems and Control"
