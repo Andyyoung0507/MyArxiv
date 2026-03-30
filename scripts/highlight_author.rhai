@@ -1,8 +1,21 @@
 import "scripts/config" as cfg;
 let authors = params[0];
 
-let authors_rg = RegexCaseInsensitive(`(?P<key>(${cfg::authors_rg}))`);
-let authors = authors.map(|v|authors_rg.replace_all(v,"<span class=\"highlight-author\">$key</span>"));
+let result = "";
 
-let start = authors.shift();
-authors.reduce(|sum, v| sum + ", " + v, start)
+for (author, index) in authors {
+    let highlighted = author;
+
+    for key in cfg::authors_array {
+        let authors_rg = RegexCaseInsensitive(`(?P<key>(${key}))`);
+        highlighted = authors_rg.replace_all(highlighted, "<span class=\"highlight-author\">$key</span>");
+    }
+
+    if index == 0 {
+        result = highlighted;
+    } else {
+        result += ", " + highlighted;
+    }
+}
+
+result
