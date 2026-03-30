@@ -1,22 +1,23 @@
 import "scripts/config" as cfg;
 
-fn highlight_title_keywords(text) {
-    let result = text;
+fn contains_ignore_case(text, needle) {
+    text.to_lower().contains(needle.to_lower())
+}
 
+fn highlight_title_keywords(text) {
     for key in cfg::titles {
-        let title_rg = RegexCaseInsensitive(`(?P<key>(${key}))`);
-        result = title_rg.replace_all(result, "<span class=\"highlight-title\">$key</span>");
+        if contains_ignore_case(text, key) {
+            return "<span class=\"highlight-title\">" + text + "</span>";
+        }
     }
 
-    result
+    text
 }
 
 fn has_highlight_author(authors) {
     for author in authors {
         for key in cfg::authors_array {
-            let author_rg = RegexCaseInsensitive(`(${key})`);
-
-            if author_rg.is_match(author) {
+            if contains_ignore_case(author, key) {
                 return true;
             }
         }
@@ -34,7 +35,7 @@ let title = highlight_title_keywords(title);
 let title = if has_highlight_author(authors) {
     "<span class=\"highlight-title\">&#9733;</span> " + title
 } else {
-    "&#9733; " + title
+    "&#9734; " + title
 };
 
 title

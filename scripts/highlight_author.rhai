@@ -1,18 +1,26 @@
 import "scripts/config" as cfg;
 let authors = params[0];
 
-let result = "";
+fn contains_ignore_case(text, needle) {
+    text.to_lower().contains(needle.to_lower())
+}
 
-for (author, index) in authors {
+let result = "";
+let first = true;
+
+for author in authors {
     let highlighted = author;
 
     for key in cfg::authors_array {
-        let authors_rg = RegexCaseInsensitive(`(?P<key>(${key}))`);
-        highlighted = authors_rg.replace_all(highlighted, "<span class=\"highlight-author\">$key</span>");
+        if contains_ignore_case(author, key) {
+            highlighted = "<span class=\"highlight-author\">" + author + "</span>";
+            break;
+        }
     }
 
-    if index == 0 {
+    if first {
         result = highlighted;
+        first = false;
     } else {
         result += ", " + highlighted;
     }

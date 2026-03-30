@@ -1,18 +1,16 @@
 import "scripts/config" as cfg;
 let comment = params[0];
 
+fn contains_ignore_case(text, needle) {
+    text.to_lower().contains(needle.to_lower())
+}
+
 if comment != () {
     let conference = "";
 
     for key in cfg::conferences {
-        let conferences_rg = Regex(`(?P<key>(${key})([\\s'-]*\\d+)?)`);
-        let matched = conferences_rg.find(comment);
-
-        if matched != () {
-            conference = matched.text;
-        }
-
-        if conference != "" {
+        if contains_ignore_case(comment, key) {
+            conference = key;
             break;
         }
     }
