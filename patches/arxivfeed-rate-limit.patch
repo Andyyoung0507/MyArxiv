@@ -1,0 +1,187 @@
+diff --git a/src/main.rs b/src/main.rs
+index ae0b7d7..50a4cbc 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -15,8 +15,20 @@ use chrono::{Duration, Utc};
+ use render::handlebars;
+ use std::fs::File;
+ use std::io::Write;
++use std::time::Duration as StdDuration;
++use tokio::time::sleep;
+ use tracing::{info, span};
+ 
++fn arxiv_user_agent() -> String {
++    std::env::var("ARXIVFEED_USER_AGENT").unwrap_or_else(|_| {
++        format!(
++            "{}/{} (+https://github.com/NotCraft/ArxivFeed)",
++            env!("CARGO_PKG_NAME"),
++            env!("CARGO_PKG_VERSION")
++        )
++    })
++}
++
+ #[tokio::main]
+ async fn main() -> Result<()> {
+     tracing_subscriber::fmt()
+@@ -27,13 +39,19 @@ async fn main() -> Result<()> {
+     let _enter = root.enter();
+ 
+     let config = Config::new()?;
+-    let client = reqwest::Client::builder().build()?;
++    let client = reqwest::Client::builder()
++        .user_agent(arxiv_user_agent())
++        .build()?;
+ 
+     let today = Utc::today().and_hms(0, 0, 0);
+     let cache_day = today - Duration::days(config.limit_days + 1);
+ 
+     let mut raw_data: ArxivCollection = from_cache(&config.cache_url, &client).await;
+-    for source in &config.sources {
++    for (index, source) in config.sources.iter().enumerate() {
++        if index > 0 {
++            info!("Sleep 3s before next arXiv request.");
++            sleep(StdDuration::from_secs(3)).await;
++        }
+         info!("Get: {}", source.category);
+         let query = ArxivQueryBuilder::new()
+             .search_query(&format!("cat:{}", source.category))
+@@ -77,3 +95,36 @@ async fn main() -> Result<()> {
+     info!("{} generated", index_path.to_string_lossy());
+     Ok(())
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::arxiv_user_agent;
++    use std::sync::{Mutex, OnceLock};
++
++    fn env_lock() -> &'static Mutex<()> {
++        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
++        LOCK.get_or_init(|| Mutex::new(()))
++    }
++
++    #[test]
++    fn arxiv_user_agent_uses_default_value() {
++        let _guard = env_lock().lock().unwrap();
++        std::env::remove_var("ARXIVFEED_USER_AGENT");
++
++        let user_agent = arxiv_user_agent();
++
++        assert!(user_agent.contains(env!("CARGO_PKG_NAME")));
++        assert!(user_agent.contains("https://github.com/NotCraft/ArxivFeed"));
++    }
++
++    #[test]
++    fn arxiv_user_agent_uses_environment_override() {
++        let _guard = env_lock().lock().unwrap();
++        let expected = "MyArxiv/1.0 (+https://github.com/example/repo)";
++        std::env::set_var("ARXIVFEED_USER_AGENT", expected);
++
++        assert_eq!(arxiv_user_agent(), expected);
++
++        std::env::remove_var("ARXIVFEED_USER_AGENT");
++    }
++}
+diff --git a/src/fetch.rs b/src/fetch.rs
+index 76e767e..9ae473f 100644
+--- a/src/fetch.rs
++++ b/src/fetch.rs
+@@ -1,11 +1,12 @@
+ use crate::structs::{Arxiv, ArxivQuery};
+ use crate::{ArxivCollection, Config};
+-use anyhow::Result;
++use anyhow::{bail, Result};
+ use reqwest::{Client, IntoUrl};
+ use serde::de::DeserializeOwned;
+ use std::fs;
+ use std::fs::File;
+ use std::path::Path;
++use tokio::time::{sleep, Duration};
+ use tracing::{info, warn};
+ use xml::reader::{EventReader, XmlEvent};
+ 
+@@ -57,9 +58,38 @@ pub fn dump_cache(cache_data: &ArxivCollection, config: &Config) -> Result<()> {
+ /// let arxivs = fetch_arxivs(query).await?;
+ /// ```
+ pub async fn fetch_arxivs(query: ArxivQuery, client: &Client) -> Result<Vec<Arxiv>> {
+-    let body = client.get(query.to_url()).send().await?.text().await?;
+-    let arxivs = parse_data(body)?;
+-    Ok(arxivs)
++    let url = query.to_url();
++
++    for attempt in 0..3 {
++        let response = client.get(&url).send().await?;
++        let status = response.status();
++        let body = response.text().await?;
++
++        match ensure_success_response(status, body) {
++            Ok(body) => return Ok(parse_data(body)?),
++            Err(err) if status == reqwest::StatusCode::TOO_MANY_REQUESTS && attempt < 2 => {
++                let wait_seconds = 5 * (attempt as u64 + 1);
++                warn!("{} Retrying in {}s...", err, wait_seconds);
++                sleep(Duration::from_secs(wait_seconds)).await;
++            }
++            Err(err) => return Err(err),
++        }
++    }
++
++    unreachable!("429 retry loop must return or fail")
++}
++
++fn ensure_success_response(status: reqwest::StatusCode, body: String) -> Result<String> {
++    if status.is_success() {
++        return Ok(body);
++    }
++
++    let body = body.trim().to_string();
++    if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
++        bail!("arXiv API rate limited: {}", body);
++    }
++
++    bail!("arXiv API request failed with status {}: {}", status, body)
+ }
+ 
+ fn parse_data(body: String) -> Result<Vec<Arxiv>> {
+@@ -136,3 +166,29 @@ fn parse_data(body: String) -> Result<Vec<Arxiv>> {
+     }
+     Ok(arxivs)
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::ensure_success_response;
++    use reqwest::StatusCode;
++
++    #[test]
++    fn ensure_success_response_returns_body_on_success() {
++        let body = "<?xml version='1.0'?><feed></feed>".to_string();
++
++        let result = ensure_success_response(StatusCode::OK, body.clone()).unwrap();
++
++        assert_eq!(result, body);
++    }
++
++    #[test]
++    fn ensure_success_response_rejects_rate_limited_body() {
++        let error =
++            ensure_success_response(StatusCode::TOO_MANY_REQUESTS, "Rate exceeded.".to_string())
++                .unwrap_err()
++                .to_string();
++
++        assert!(error.contains("rate limited"));
++        assert!(error.contains("Rate exceeded."));
++    }
++}
+diff --git a/src/query.rs b/src/query.rs
+index a45e04b..b8caa56 100644
+--- a/src/query.rs
++++ b/src/query.rs
+@@ -3,7 +3,7 @@ use crate::structs::{ArxivQuery, ArxivQueryBuilder};
+ impl ArxivQueryBuilder {
+     pub fn new() -> Self {
+         ArxivQueryBuilder {
+-            base_url: "http://export.arxiv.org/api/query?".to_string(),
++            base_url: "https://export.arxiv.org/api/query?".to_string(),
+             ..ArxivQueryBuilder::default()
+         }
+     }

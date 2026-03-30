@@ -16,32 +16,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-      - name: Download ArxivFeed
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Download ArxivFeed Source
         env:
           ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
           GITHUB_PAT: ${{ github.token }}
           REPO: "NotCraft/ArxivFeed"
-          VERSION: "latest"
-          MATCH: "arxivfeed-.+-x86_64-unknown-linux-musl.tar.gz$"
-          RENAME: "arxivfeed.tgz"
+          VERSION: "v0.1.4"
         shell: bash
         run: |
           curl -sL --fail \
-            -H "Accept: application/vnd.github.v3+json" \
+            -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${GITHUB_PAT}" \
-              "https://api.github.com/repos/${REPO}/releases/${VERSION}" \
-              | jq -r ".assets | .[] | select(.name | test(\"${MATCH}\")) | .url" \
-              | tee asset.url
-          curl -sL --fail \
-            -H "Accept: application/octet-stream" \
-            -H "Authorization: Bearer ${GITHUB_PAT}" \
-              -o "${RENAME}" \
-              "$(cat asset.url)"
-          tar -zxvf arxivfeed.tgz --strip-components 1 $(tar tf arxivfeed.tgz | grep /arxivfeed)
-          chmod +x arxivfeed
+              "https://api.github.com/repos/${REPO}/tarball/${VERSION}" \
+              -o arxivfeed-src.tgz
+          mkdir arxivfeed-src
+          tar -zxvf arxivfeed-src.tgz --strip-components 1 -C arxivfeed-src
+      - name: Patch ArxivFeed
+        shell: bash
+        run: patch -p1 -d arxivfeed-src < patches/arxivfeed-rate-limit.patch
+      - name: Build ArxivFeed
+        working-directory: arxivfeed-src
+        run: cargo build --release
       - name: Build rss
-        run: ./arxivfeed
+        env:
+          ARXIVFEED_USER_AGENT: "MyArxiv/1.0 (+https://github.com/${{ github.repository }})"
+        run: ./arxivfeed-src/target/release/arxivfeed
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
