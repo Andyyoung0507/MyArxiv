@@ -36,9 +36,9 @@ jobs:
       - name: Patch ArxivFeed
         shell: bash
         run: patch -p1 -d arxivfeed-src < patches/arxivfeed-rate-limit.patch
-      - name: Refresh Rhai Codegen
+      - name: Refresh Rhai Runtime
         working-directory: arxivfeed-src
-        run: cargo update -p rhai_codegen --precise 1.4.0
+        run: cargo update -p rhai --precise 1.24.0
       - name: Build ArxivFeed
         working-directory: arxivfeed-src
         run: cargo build --release
