@@ -28,7 +28,7 @@ fn has_highlight_author(authors) {
 let title = params[0];
 let authors = params[1];
 
-let title = title.trim();
+title.trim();
 let title = highlight_title_keywords(title);
 
 let title = if has_highlight_author(authors) {
