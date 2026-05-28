@@ -16,11 +16,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - name: Download ArxivFeed Source
         env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
           GITHUB_PAT: ${{ github.token }}
           REPO: "NotCraft/ArxivFeed"
           VERSION: "v0.1.4"
@@ -47,7 +46,7 @@ jobs:
           ARXIVFEED_USER_AGENT: "MyArxiv/1.0 (+https://github.com/${{ github.repository }})"
         run: ./arxivfeed-src/target/release/arxivfeed
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./target
